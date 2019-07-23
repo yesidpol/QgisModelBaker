@@ -98,3 +98,30 @@ class OraConnector(DBConnector):
             if query.next():
                 result = bool(query.value(0))
         return result
+
+    def get_meta_attrs(self, ili_name):
+        if not self._table_exists(OraConnector.METAATTRS_TABLE):
+            return []
+        result = []
+
+        if self.schema:
+            query = QSqlQuery(self.conn)
+            stmt = """SELECT ATTR_NAME, ATTR_VALUE FROM {schema}.{metaattrs_table} WHERE ILIELEMENT='{ili_name}'"""\
+                .format(schema=self.schema, metaattrs_table=OraConnector.METAATTRS_TABLE, ili_name=ili_name)
+
+            if not query.exec(stmt):
+                error = query.lastError().text()
+                raise DBConnectorError(error)
+
+            result = self._get_dict_result(query)
+        return result
+
+    def _get_dict_result(self, query):
+        record = query.record()
+        result = []
+        while query.next():
+            my_rec = dict()
+            for x in range(record.count()):
+                my_rec[record.fieldName(x)] = query.value(x)
+            result.append(my_rec)
+        return result
