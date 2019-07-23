@@ -38,14 +38,27 @@ class OraConnector(DBConnector):
             error = 'ERROR: ' + db.lastError().text()
             raise DBConnectorError(error)
 
-        # TODO is there a field missing?
-        db.setHostName(data_source_uri.host())
+        host = data_source_uri.host()
+        if not host:
+            host = 'localhost'
+
+        db.setHostName(host)
         db.setDatabaseName(data_source_uri.database())
         db.setUserName(data_source_uri.username())
         db.setPassword(data_source_uri.password())
 
+        port = data_source_uri.port()
+
+        if port:
+            try:
+                port_int = int(port)
+            except ValueError:
+                raise DBConnectorError("The port must be an integer")
+
+            db.setPort(port_int)
+
         if not db.open():
-            error = 'ERROR: ' + db.lastError().text()
+            error = db.lastError().text()
             raise DBConnectorError(error)
 
         self.conn = db
@@ -53,7 +66,18 @@ class OraConnector(DBConnector):
 
         self._bMetadataTable = self._metadata_exists()
         # TODO ilicode??
-        db.close()
+
+    def db_or_schema_exists(self):
+        result=False
+        if self.schema:
+            query = QSqlQuery(self.conn)
+            stmt = """SELECT count(USERNAME) AS COUNT FROM DBA_USERS where USERNAME='{}'""".format(self.schema)
+            if not query.exec(stmt):
+                error = query.lastError().text()
+                raise DBConnectorError(error)
+            if query.next():
+                result=bool(query.value(0))
+        return result
 
     def metadata_exists(self):
         return self._bMetadataTable
@@ -65,10 +89,12 @@ class OraConnector(DBConnector):
         result = False
 
         if self.schema:
-            cur = QSqlQuery(self.conn)
-            query = """SELECT COUNT(TABLE_NAME) AS count FROM ALL_TABLES
+            query = QSqlQuery(self.conn)
+            stmt = """SELECT COUNT(TABLE_NAME) AS count FROM ALL_TABLES
                 WHERE OWNER='{}' AND TABLE_NAME='{}'""".format(self.schema, tablename)
-            cur.exec(query)
-            if cur.next():
-                result = bool(cur.value(0))
+            if not query.exec(stmt):
+                error = query.lastError().text()
+                raise DBConnectorError(error)
+            if query.next():
+                result = bool(query.value(0))
         return result
