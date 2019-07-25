@@ -191,6 +191,59 @@ class OraConnector(DBConnector):
             result = self._get_dict_result(query)
         return result
 
+    def get_fields_info(self, table_name):
+        res = []
+        # Get all fields for this table
+        if self.schema:
+            ln = "\n"
+            stmt = ""
+            metadata_exists = self.metadata_exists()
+
+            stmt += ln + "SELECT DISTINCT"
+            stmt += ln + "      c.COLUMN_NAME"
+            stmt += ln + "    , c.DATA_TYPE AS data_type"
+            stmt += ln + "    , c.DATA_SCALE AS numeric_scale -- rev"
+            if metadata_exists:
+                stmt += ln + "    , unit.setting AS unit"
+                stmt += ln + "    , txttype.setting AS texttype"
+                stmt += ln + "    , alias.setting AS column_alias"
+                stmt += ln + "    , full_name.iliname AS fully_qualified_name"
+            stmt += ln + "    , cmmts.COMMENTS AS \"COMMENT\" -- rev"
+            stmt += ln + "FROM ALL_TAB_COLUMNS c"
+            if metadata_exists:
+                stmt += ln + "LEFT JOIN \"{schema}\".T_ILI2DB_COLUMN_PROP unit"
+                stmt += ln + "    ON c.TABLE_NAME = UPPER(unit.TABLENAME)"
+                stmt += ln + "    AND c.COLUMN_NAME = UPPER(unit.COLUMNNAME)"
+                stmt += ln + "    AND unit.TAG = 'ch.ehi.ili2db.unit'"
+                stmt += ln + "LEFT JOIN \"{schema}\".T_ILI2DB_COLUMN_PROP txttype"
+                stmt += ln + "    ON c.TABLE_NAME = UPPER(txttype.TABLENAME)"
+                stmt += ln + "    AND c.COLUMN_NAME = UPPER(txttype.columnname)"
+                stmt += ln + "    AND txttype.TAG = 'ch.ehi.ili2db.textKind'"
+                stmt += ln + "LEFT JOIN \"{schema}\".T_ILI2DB_COLUMN_PROP alias"
+                stmt += ln + "    ON c.TABLE_NAME = UPPER(alias.TABLENAME)"
+                stmt += ln + "    AND c.COLUMN_NAME = UPPER(alias.COLUMNNAME)"
+                stmt += ln + "    AND alias.TAG = 'ch.ehi.ili2db.dispName'"
+                stmt += ln + "LEFT JOIN \"{schema}\".T_ILI2DB_ATTRNAME full_name"
+                stmt += ln + "    ON  c.TABLE_NAME =UPPER(full_name.OWNER)"
+                stmt += ln + "    AND c.COLUMN_NAME=UPPER(full_name.sqlname)"
+            stmt += ln + "LEFT JOIN ALL_COL_COMMENTS cmmts"
+            stmt += ln + "    ON c.OWNER = cmmts.OWNER"
+            stmt += ln + "    AND c.TABLE_NAME = cmmts.TABLE_NAME"
+            stmt += ln + "    AND c.COLUMN_NAME = cmmts.COLUMN_NAME"
+            stmt += ln + "WHERE c.TABLE_NAME = UPPER('{table}')"
+            stmt += ln + "    AND c.OWNER = '{schema}'"
+            stmt = stmt.format(schema=self.schema,table=table_name)
+
+            query = QSqlQuery(self.conn)
+
+            if not query.exec(stmt):
+                error = query.lastError().text()
+                raise DBConnectorError(error)
+
+            res = self._get_dict_result(query)
+
+        return res
+
     def _get_dict_result(self, query):
         record = query.record()
         result = []
