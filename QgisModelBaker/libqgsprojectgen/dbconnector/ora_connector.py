@@ -244,7 +244,41 @@ class OraConnector(DBConnector):
 
         return res
 
-    def _get_dict_result(self, query):
+    def get_constraints_info(self, table_name):
+        res = {}
+
+        if self.schema:
+            ln = "\n"
+            stmt = ""
+
+            stmt += ln + "SELECT SEARCH_CONDITION"
+            stmt += ln + "FROM ALL_CONSTRAINTS"
+            stmt += ln + "WHERE"
+            stmt += ln + "    CONSTRAINT_TYPE='C'"
+            stmt += ln + "    AND OWNER = '{schema}'"
+            stmt += ln + "    AND TABLE_NAME=UPPER('{table}')"
+
+            stmt = stmt.format(schema=self.schema, table=table_name)
+
+            query = QSqlQuery(self.conn)
+
+            if not query.exec(stmt):
+                error = query.lastError().text()
+                raise DBConnectorError(error)
+
+            regex = r"[\t ]+([A-Za-z_0-9]+) BETWEEN ([+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?) AND ([+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)"
+
+            while query.next():
+                constraint_expression = query.value(0)
+                m = re.match(regex, constraint_expression)
+
+                if m:
+                    res[m.group(1)] = (m.group(2), m.group(3))
+
+        return res
+
+    @staticmethod
+    def _get_dict_result(query):
         record = query.record()
         result = []
         while query.next():
