@@ -277,6 +277,46 @@ class OraConnector(DBConnector):
 
         return res
 
+    def get_relations_info(self, filter_layer_list=[]):
+        res = []
+
+        if self.schema:
+            ln = "\n"
+            stmt = ""
+
+            stmt += ln + "SELECT "
+            stmt += ln + "      RR.CONSTRAINT_NAME AS constraint_name"
+            stmt += ln + "    , FK_COL.TABLE_NAME AS referencing_table"
+            stmt += ln + "    , FK_COL.COLUMN_NAME AS referencing_column"
+            stmt += ln + "    , RR.OWNER AS constraint_schema"
+            stmt += ln + "    , PK_COL.TABLE_NAME AS referenced_table"
+            stmt += ln + "    , PK_COL.COLUMN_NAME AS referenced_column"
+            stmt += ln + "    , FK_COL.POSITION AS ordinal_position"
+            stmt += ln + "FROM ALL_CONSTRAINTS  RR"
+            stmt += ln + "INNER JOIN ALL_CONS_COLUMNS FK_COL"
+            stmt += ln + "    ON RR.OWNER = FK_COL.OWNER"
+            stmt += ln + "    AND RR.CONSTRAINT_NAME = FK_COL.CONSTRAINT_NAME"
+            stmt += ln + "INNER JOIN ALL_CONS_COLUMNS PK_COL"
+            stmt += ln + "    ON RR.R_OWNER = PK_COL.OWNER"
+            stmt += ln + "    AND RR.R_CONSTRAINT_NAME = PK_COL.CONSTRAINT_NAME"
+            stmt += ln + "WHERE RR.CONSTRAINT_TYPE = 'R'"
+            stmt += ln + "    AND RR.OWNER='{schema}'"
+            if filter_layer_list:
+                stmt += ln + "    AND RR.TABLE_NAME IN ('{}')".format("','".join(filter_layer_list))
+            stmt += ln + "ORDER BY RR.CONSTRAINT_NAME, FK_COL.POSITION"
+
+            stmt = stmt.format(schema=self.schema)
+
+            query = QSqlQuery(self.conn)
+
+            if not query.exec(stmt):
+                error = query.lastError().text()
+                raise DBConnectorError(error)
+
+            res = self._get_dict_result(query)
+
+        return res
+
     @staticmethod
     def _get_dict_result(query):
         record = query.record()
