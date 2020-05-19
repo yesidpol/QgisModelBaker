@@ -58,7 +58,7 @@ class MssqlFactory(DbFactory):
 
         :return str A download url.
         """
-        return 'https://downloads.interlis.ch/ili2mssql/ili2mssql-{version}.zip'.format(version=self.get_tool_version(db_ili_version))
+        return 'https://github.com/SwissTierrasColombia/ili2db/releases/download/ili2mssql-{version}/ili2mssql-{version}.zip'.format(version=self.get_tool_version(db_ili_version))
 
     def customize_widget_editor(self, field: Field, data_type: str):
         if 'bit' in data_type:
